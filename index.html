@@ -287,8 +287,9 @@ function extractDate(html, url) {
     }
   }
 
-  // 9. Last resort: scan first 4000 chars of visible text for English date patterns
-  const bodyText = (doc.body?.innerText || doc.body?.textContent || '').slice(0, 4000);
+  // 9. Last resort: scan visible text for English date patterns
+  // NOTE: use textContent (not innerText) — innerText is empty in DOMParser documents
+  const bodyText = (doc.body?.textContent || '').slice(0, 6000);
   const engDateRe = /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i;
   const bodyM = bodyText.match(engDateRe);
   if (bodyM) { const d = parseDate(bodyM[0]); if (d && d.getFullYear() > 2000) return d; }
@@ -364,9 +365,17 @@ async function analyzeUrl(url, projectDate, keywords) {
     result.error = true;
     result.publication_date_str = 'Error';
     const msg = e.message || '';
-    if (msg.includes('403')) result.notes.push('HTTP 403 – site blocks access (paywall / bot protection)');
-    else if (e.name === 'TimeoutError' || msg.includes('timeout')) result.notes.push('Connection timeout');
-    else result.notes.push(msg.slice(0, 80) || 'Unknown error');
+    const host = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
+    const isYahooAol = /yahoo\.com|aol\.(com|co\.uk)/.test(host);
+    if (msg.includes('403')) {
+      result.notes.push('HTTP 403 – site blocks automated access (paywall / bot protection)');
+    } else if (isYahooAol) {
+      result.notes.push('Yahoo/AOL blocks all proxy access – cannot fetch automatically');
+    } else if (e.name === 'AbortError' || msg.toLowerCase().includes('timeout')) {
+      result.notes.push('Connection timeout');
+    } else {
+      result.notes.push('Failed to fetch – site may block automated access');
+    }
   }
 
   return result;
