@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Article Keyword Checker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; min-height: 100vh; }
+    header { background: #1a1a2e; color: #fff; padding: 20px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 28px 32px; margin-bottom: 24px; }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 18px; color: #1a1a2e; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+    label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: 6px; color: #444; }
+    textarea, input[type="date"], input[type="text"] { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: .9rem; font-family: inherit; transition: border-color .2s; background: #fafafa; }
+    textarea:focus, input:focus { outline: none; border-color: #4f46e5; background: #fff; }
+    textarea { resize: vertical; min-height: 160px; }
+    .keywords-wrapper { display: flex; flex-direction: column; gap: 8px; }
+    .kw-row { display: flex; gap: 8px; }
+    .kw-row input { flex: 1; }
+    .btn-icon { background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; width: 36px; height: 36px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-icon:hover { background: #fca5a5; }
+    .btn-add-kw { align-self: flex-start; background: none; border: 1px dashed #4f46e5; color: #4f46e5; border-radius: 6px; padding: 6px 14px; font-size: .85rem; cursor: pointer; margin-top: 4px; }
+    .btn-add-kw:hover { background: #eef2ff; }
+    .form-footer { display: flex; align-items: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+    .btn-analyze { background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background .2s; }
+    .btn-analyze:hover { background: #3730a3; }
+    .btn-analyze:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .btn-export { background: #059669; color: #fff; border: none; border-radius: 8px; padding: 12px 22px; font-size: .9rem; font-weight: 600; cursor: pointer; display: none; }
+    .btn-export:hover { background: #047857; }
+    .hint { font-size: .8rem; color: #888; }
+    #progress-section { display: none; }
+    .progress-bar-wrap { background: #e5e7eb; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+    .progress-bar-fill { height: 100%; background: #4f46e5; border-radius: 99px; transition: width .3s; width: 0%; }
+    .progress-label { font-size: .85rem; color: #555; }
+    #results-section { display: none; }
+    .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat-chip { border-radius: 99px; padding: 4px 14px; font-size: .82rem; font-weight: 500; }
+    .stat-chip.gray { background: #f3f4f6; color: #374151; }
+    .stat-chip.red { background: #fee2e2; color: #991b1b; }
+    .stat-chip.green { background: #dcfce7; color: #166534; }
+    .stat-chip.yellow { background: #fef9c3; color: #854d0e; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; min-width: 700px; }
+    thead tr { background: #f8fafc; }
+    th { text-align: left; padding: 10px 12px; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f1f1; vertical-align: top; word-break: break-word; }
+    tr:hover td { background: #fafafa; }
+    .url-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .url-cell a { color: #4f46e5; text-decoration: none; }
+    .url-cell a:hover { text-decoration: underline; }
+    .badge { display: inline-block; border-radius: 5px; padding: 2px 9px; font-size: .78rem; font-weight: 600; }
+    .badge-yes  { background: #dcfce7; color: #166534; }
+    .badge-no   { background: #fee2e2; color: #991b1b; }
+    .badge-unknown { background: #f3f4f6; color: #6b7280; }
+    .badge-error { background: #fef3c7; color: #92400e; }
+    .badge-kw-yes { background: #dbeafe; color: #1e40af; }
+    .badge-kw-no  { background: #f3f4f6; color: #6b7280; }
+    .notes-cell { color: #888; font-size: .8rem; }
+    #error-msg { background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 12px 16px; font-size: .9rem; margin-bottom: 16px; display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>&#128269;</span>
+  <h1>Article Keyword Checker</h1>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Configuration</h2>
+    <div class="form-grid">
+      <div>
+        <label for="urls">Article URLs <span class="hint">(one per line)</span></label>
+        <textarea id="urls" placeholder="https://example.com/article-1&#10;https://example.com/article-2"></textarea>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div>
+          <label for="project-date">Project creation date</label>
+          <input type="date" id="project-date" />
+        </div>
+        <div>
+          <label>Keywords <span class="hint">(case-insensitive)</span></label>
+          <div class="keywords-wrapper" id="keywords-wrapper">
+            <div class="kw-row">
+              <input type="text" placeholder="e.g. brand name" />
+              <button class="btn-icon" onclick="removeKeyword(this)" title="Remove">&#10005;</button>
+            </div>
+          </div>
+          <button class="btn-add-kw" onclick="addKeyword()">+ Add keyword</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-footer">
+      <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis()">Analyze</button>
+      <button class="btn-export" id="btn-export" onclick="exportCSV()">Export CSV</button>
+      <span class="hint" id="url-count"></span>
+    </div>
+  </div>
+
+  <div id="error-msg"></div>
+
+  <div class="card" id="progress-section">
+    <h2 id="progress-title">Analyzing…</h2>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill"></div></div>
+    <div class="progress-label" id="progress-label">Starting…</div>
+  </div>
+
+  <div class="card" id="results-section">
+    <div class="results-header">
+      <h2>Results</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── CORS Proxy ────────────────────────────────────────────────────────────────
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+
+async function fetchPage(url) {
+  for (const proxy of PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(20000) });
+      if (res.ok) return await res.text();
+      if (res.status === 403) throw new Error('HTTP 403');
+    } catch (e) {
+      if (e.message === 'HTTP 403' || PROXIES.indexOf(proxy) === PROXIES.length - 1) throw e;
+    }
+  }
+  throw new Error('All proxies failed');
+}
+
+// ─── Date Parsing ──────────────────────────────────────────────────────────────
+const MONTH_PL = { 'stycznia':0,'lutego':1,'marca':2,'kwietnia':3,'maja':4,'czerwca':5,'lipca':6,'sierpnia':7,'września':8,'października':9,'listopada':10,'grudnia':11 };
+
+function parseDate(str) {
+  if (!str) return null;
+  str = str.trim();
+
+  // Polish date: "12 marca 2026"
+  const plMatch = str.match(/(\d{1,2})\s+([a-ząćęłńóśźż]+)\s+(\d{4})/i);
+  if (plMatch && MONTH_PL[plMatch[2].toLowerCase()] !== undefined) {
+    const d = new Date(+plMatch[3], MONTH_PL[plMatch[2].toLowerCase()], +plMatch[1]);
+    if (!isNaN(d)) return d;
+  }
+
+  // dd.mm.yyyy
+  const dmy = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dmy) { const d = new Date(+dmy[3], +dmy[2]-1, +dmy[1]); if (!isNaN(d)) return d; }
+
+  // dd/mm/yyyy
+  const dmy2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmy2) { const d = new Date(+dmy2[3], +dmy2[2]-1, +dmy2[1]); if (!isNaN(d)) return d; }
+
+  // ISO and standard
+  const d = new Date(str);
+  if (!isNaN(d) && d.getFullYear() > 2000 && d.getFullYear() < 2100) return d;
+
+  return null;
+}
+
+function searchObjForDate(obj, depth = 0) {
+  if (!obj || depth > 6) return null;
+  if (typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const key of ['datePublished','dateCreated','dateModified']) {
+      if (obj[key]) { const d = parseDate(String(obj[key])); if (d) return d; }
+    }
+    for (const val of Object.values(obj)) {
+      const d = searchObjForDate(val, depth + 1);
+      if (d) return d;
+    }
+  } else if (Array.isArray(obj)) {
+    for (const item of obj) { const d = searchObjForDate(item, depth + 1); if (d) return d; }
+  }
+  return null;
+}
+
+// ─── Date Extraction ───────────────────────────────────────────────────────────
+function extractDate(html, url) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // 1. JSON-LD
+  for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      const d = searchObjForDate(JSON.parse(script.textContent));
+      if (d) return d;
+    } catch(e) {}
+  }
+
+  // 2. Meta tags
+  const metaSelectors = [
+    '[property="article:published_time"]', '[property="og:article:published_time"]',
+    '[name="publishdate"]', '[name="date"]', '[name="DC.date"]', '[name="DC.Date"]',
+    '[itemprop="datePublished"]', '[name="pubdate"]', '[name="publication_date"]',
+    '[name="sailthru.date"]', '[name="parsely-pub-date"]', '[name="created"]',
+  ];
+  for (const sel of metaSelectors) {
+    const el = doc.querySelector(`meta${sel}`);
+    if (el?.content) { const d = parseDate(el.content); if (d) return d; }
+  }
+
+  // 3. <time datetime="...">
+  for (const t of doc.querySelectorAll('time[datetime]')) {
+    const d = parseDate(t.getAttribute('datetime'));
+    if (d) return d;
+  }
+
+  // 4. itemprop=datePublished on any element
+  for (const el of doc.querySelectorAll('[itemprop="datePublished"]')) {
+    const val = el.getAttribute('content') || el.getAttribute('datetime') || el.textContent;
+    if (val) { const d = parseDate(val); if (d) return d; }
+  }
+
+  // 5. Dates embedded in <script> tags (Yahoo, AOL pattern)
+  const scriptDateRe = /"(?:datePublished|publishedAt|pubDate|date_published)"\s*:\s*"(\d{4}-\d{2}-\d{2}[^"]*)"/;
+  for (const script of doc.querySelectorAll('script')) {
+    const m = (script.textContent || '').match(scriptDateRe);
+    if (m) { const d = parseDate(m[1]); if (d) return d; }
+  }
+
+  // 6. data-* attributes
+  for (const attr of ['data-date','data-published','data-pubdate','data-timestamp','data-datetime']) {
+    const el = doc.querySelector(`[${attr}]`);
+    if (el) {
+      const val = el.getAttribute(attr);
+      // Unix ms timestamp
+      if (/^\d{13}$/.test(val)) {
+        const d = new Date(+val);
+        if (!isNaN(d) && d.getFullYear() > 2000) return d;
+      }
+      const d = parseDate(val);
+      if (d) return d;
+    }
+  }
+
+  // 7. Elements with date-related CSS classes
+  const dateClassRe = /\bdate|publish|pubdate|timestamp|byline|dateline|created\b/i;
+  for (const el of doc.querySelectorAll('[class]')) {
+    if (!dateClassRe.test(el.className)) continue;
+    const text = el.textContent.trim();
+    const iso = text.match(/\d{4}-\d{2}-\d{2}/);
+    if (iso) { const d = parseDate(iso[0]); if (d && d.getFullYear() > 2000) return d; }
+    const dmy = text.match(/\d{1,2}\.\d{2}\.\d{4}/);
+    if (dmy) { const d = parseDate(dmy[0]); if (d) return d; }
+  }
+
+  // 8. URL-based: /2026/03/11/ or /2025-09-05-
+  const urlPatterns = [
+    /\/(\d{4})\/(\d{2})\/(\d{2})\//,
+    /\/(\d{4})-(\d{2})-(\d{2})[/-]/,
+    /\/(\d{4})-(\d{2})-(\d{2})$/,
+  ];
+  for (const pat of urlPatterns) {
+    const urlM = url.match(pat);
+    if (urlM) {
+      const d = new Date(+urlM[1], +urlM[2]-1, +urlM[3]);
+      if (!isNaN(d) && d.getFullYear() > 2000) return d;
+    }
+  }
+
+  // 9. Last resort: scan first 4000 chars of visible text for English date patterns
+  const bodyText = (doc.body?.innerText || doc.body?.textContent || '').slice(0, 4000);
+  const engDateRe = /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i;
+  const bodyM = bodyText.match(engDateRe);
+  if (bodyM) { const d = parseDate(bodyM[0]); if (d && d.getFullYear() > 2000) return d; }
+
+  return null;
+}
+
+// ─── Keyword Check ─────────────────────────────────────────────────────────────
+function checkKeywords(html, keywords) {
+  const lower = html.toLowerCase();
+  const result = {};
+  for (const kw of keywords) result[kw] = lower.includes(kw.toLowerCase()) ? 'YES' : 'NO';
+  return result;
+}
+
+// ─── Concurrency Helper ────────────────────────────────────────────────────────
+async function runConcurrent(tasks, concurrency, onDone) {
+  const results = new Array(tasks.length);
+  let nextIdx = 0;
+  let done = 0;
+
+  async function worker() {
+    while (nextIdx < tasks.length) {
+      const idx = nextIdx++;
+      results[idx] = await tasks[idx]();
+      done++;
+      onDone(done, tasks.length, results[idx]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  return results;
+}
+
+// ─── Main Analysis ─────────────────────────────────────────────────────────────
+let lastResults = null;
+let lastKeywords = [];
+
+async function analyzeUrl(url, projectDate, keywords) {
+  const result = {
+    url,
+    publication_date_str: '',
+    project_date: fmtDate(projectDate),
+    older_than_project: 'UNKNOWN',
+    keywords: Object.fromEntries(keywords.map(k => [k, 'NO'])),
+    notes: [],
+    error: false,
+  };
+
+  try {
+    const html = await fetchPage(url);
+
+    // Detect consent wall (no article content)
+    const lc = html.toLowerCase();
+    if ((lc.includes('consent') || lc.includes('gdpr')) && html.length < 40000) {
+      result.notes.push('Cookie consent wall detected');
+    }
+
+    const pubDate = extractDate(html, url);
+    if (pubDate) {
+      result.publication_date_str = fmtDate(pubDate);
+      const pd = new Date(projectDate); pd.setHours(0,0,0,0);
+      const pub = new Date(pubDate);    pub.setHours(0,0,0,0);
+      result.older_than_project = pub < pd ? 'YES' : 'NO';
+    } else {
+      result.publication_date_str = 'Not detected';
+      result.notes.push('Publication date not detected');
+    }
+
+    result.keywords = checkKeywords(html, keywords);
+
+  } catch (e) {
+    result.error = true;
+    result.publication_date_str = 'Error';
+    const msg = e.message || '';
+    if (msg.includes('403')) result.notes.push('HTTP 403 – site blocks access (paywall / bot protection)');
+    else if (e.name === 'TimeoutError' || msg.includes('timeout')) result.notes.push('Connection timeout');
+    else result.notes.push(msg.slice(0, 80) || 'Unknown error');
+  }
+
+  return result;
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const day = String(dt.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+// ─── UI ────────────────────────────────────────────────────────────────────────
+document.getElementById('urls').addEventListener('input', updateCount);
+function updateCount() {
+  const lines = document.getElementById('urls').value.split('\n').filter(l => l.trim());
+  const el = document.getElementById('url-count');
+  el.textContent = lines.length ? `${lines.length} URL${lines.length > 1 ? 's' : ''} detected` : '';
+}
+
+function addKeyword() {
+  const wrap = document.getElementById('keywords-wrapper');
+  const row = document.createElement('div');
+  row.className = 'kw-row';
+  row.innerHTML = `<input type="text" placeholder="keyword" /><button class="btn-icon" onclick="removeKeyword(this)">&#10005;</button>`;
+  wrap.appendChild(row);
+}
+
+function removeKeyword(btn) {
+  const wrap = document.getElementById('keywords-wrapper');
+  if (wrap.children.length <= 1) { btn.previousElementSibling.value = ''; return; }
+  btn.parentElement.remove();
+}
+
+function getKeywords() {
+  return Array.from(document.querySelectorAll('#keywords-wrapper input')).map(i => i.value.trim()).filter(Boolean);
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('btn-analyze').disabled = false;
+  document.getElementById('btn-analyze').textContent = 'Analyze';
+}
+
+function cleanUrls(raw) {
+  const invisible = /[\u200b-\u200f\u00ad\ufeff\u2028\u2029\u00a0\u202a-\u202e]/g;
+  return raw.split('\n')
+    .map(l => l.replace(invisible, '').trim())
+    .filter(l => l.startsWith('http://') || l.startsWith('https://'));
+}
+
+async function runAnalysis() {
+  document.getElementById('error-msg').style.display = 'none';
+  const rawUrls = document.getElementById('urls').value;
+  const projectDateStr = document.getElementById('project-date').value;
+  const keywords = getKeywords();
+
+  if (!rawUrls.trim()) { showError('Please enter at least one URL.'); return; }
+  if (!projectDateStr) { showError('Please select a project creation date.'); return; }
+
+  const urls = cleanUrls(rawUrls);
+  if (!urls.length) { showError('No valid URLs found. URLs must start with http:// or https://'); return; }
+
+  const projectDate = new Date(projectDateStr);
+
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = true; btn.textContent = 'Analyzing…';
+
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('btn-export').style.display = 'none';
+  const progress = document.getElementById('progress-section');
+  progress.style.display = 'block';
+  document.getElementById('progress-label').textContent = `Fetching ${urls.length} articles…`;
+  document.getElementById('progress-fill').style.width = '2%';
+
+  const tasks = urls.map(url => () => analyzeUrl(url, projectDate, keywords));
+
+  const results = await runConcurrent(tasks, 5, (done, total, _) => {
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = `Done: ${done} / ${total}`;
+  });
+
+  lastResults = results;
+  lastKeywords = keywords;
+
+  btn.disabled = false; btn.textContent = 'Analyze';
+  progress.style.display = 'none';
+
+  renderResults(results, keywords);
+}
+
+function renderResults(results, keywords) {
+  const total = results.length;
+  const errors = results.filter(r => r.error).length;
+  const older = results.filter(r => r.older_than_project === 'YES').length;
+  const newer = results.filter(r => r.older_than_project === 'NO').length;
+  const unknown = results.filter(r => r.older_than_project === 'UNKNOWN').length;
+
+  document.getElementById('stats').innerHTML = `
+    <span class="stat-chip gray">Total: ${total}</span>
+    <span class="stat-chip red">Older than project: ${older}</span>
+    <span class="stat-chip green">Published after: ${newer}</span>
+    <span class="stat-chip yellow">Unknown date: ${unknown}</span>
+    ${errors ? `<span class="stat-chip red">Errors: ${errors}</span>` : ''}
+  `;
+
+  let head = `<tr><th>#</th><th>URL</th><th>Publication date</th><th>Project date</th><th>Older than project?</th>`;
+  keywords.forEach(kw => { head += `<th>${esc(kw)}</th>`; });
+  head += `<th>Notes</th></tr>`;
+  document.getElementById('table-head').innerHTML = head;
+
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  results.forEach((r, i) => {
+    const olderBadge = { YES: '<span class="badge badge-yes">YES</span>', NO: '<span class="badge badge-no">NO</span>', UNKNOWN: '<span class="badge badge-unknown">UNKNOWN</span>' }[r.older_than_project] || '<span class="badge badge-unknown">UNKNOWN</span>';
+    const datePart = r.error ? `<span class="badge badge-error">${esc(r.publication_date_str)}</span>` : esc(r.publication_date_str) || '–';
+    let kwCells = '';
+    keywords.forEach(kw => {
+      const v = r.keywords[kw] || 'NO';
+      kwCells += `<td><span class="badge ${v === 'YES' ? 'badge-kw-yes' : 'badge-kw-no'}">${v}</span></td>`;
+    });
+    const notes = r.notes.join('; ');
+    tbody.innerHTML += `<tr>
+      <td>${i+1}</td>
+      <td class="url-cell" title="${esc(r.url)}"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a></td>
+      <td>${datePart}</td>
+      <td>${esc(r.project_date)}</td>
+      <td>${olderBadge}</td>
+      ${kwCells}
+      <td>${notes ? `<span class="notes-cell">${esc(notes)}</span>` : '–'}</td>
+    </tr>`;
+  });
+
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('btn-export').style.display = 'inline-block';
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function exportCSV() {
+  if (!lastResults) return;
+  const headers = ['#','URL','Publication date','Project date','Older than project?'];
+  lastKeywords.forEach(kw => headers.push(kw + ' found?'));
+  headers.push('Notes');
+  const rows = [headers.map(csvEsc).join(',')];
+  lastResults.forEach((r, i) => {
+    const row = [i+1, r.url, r.publication_date_str, r.project_date, r.older_than_project];
+    lastKeywords.forEach(kw => row.push(r.keywords[kw] || 'NO'));
+    row.push(r.notes.join('; '));
+    rows.push(row.map(csvEsc).join(','));
+  });
+  const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `analysis_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function csvEsc(v) { const s=String(v??''); return (s.includes(',')||s.includes('"')||s.includes('\n')) ? '"'+s.replace(/"/g,'""')+'"' : s; }
+</script>
+</body>
+</html>
