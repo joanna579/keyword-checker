@@ -130,21 +130,32 @@
 <script>
 // ─── CORS Proxy ────────────────────────────────────────────────────────────────
 const PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
 ];
 
 async function fetchPage(url) {
-  for (const proxy of PROXIES) {
+  let lastError = new Error('Could not fetch article');
+  for (const makeProxy of PROXIES) {
     try {
-      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(20000) });
-      if (res.ok) return await res.text();
-      if (res.status === 403) throw new Error('HTTP 403');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 18000);
+      const res = await fetch(makeProxy(url), { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const text = await res.text();
+        // Make sure we got real content, not an error page
+        if (text && text.length > 200) return text;
+      }
+      lastError = new Error(`HTTP ${res.status}`);
     } catch (e) {
-      if (e.message === 'HTTP 403' || PROXIES.indexOf(proxy) === PROXIES.length - 1) throw e;
+      lastError = e.name === 'AbortError' ? new Error('Timeout') : e;
     }
+    // Always try next proxy — don't stop on 403
   }
-  throw new Error('All proxies failed');
+  throw lastError;
 }
 
 // ─── Date Parsing ──────────────────────────────────────────────────────────────
